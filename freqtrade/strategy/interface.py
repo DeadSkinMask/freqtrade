@@ -54,6 +54,11 @@ class IStrategy(ABC, HyperStrategyMixin):
     # associated stoploss
     stoploss: float
 
+    # custom daily stoploss
+    daily_stoploss: float
+    # custom daily stopp gain
+    daily_stopprofit: float
+
     # trailing stoploss
     trailing_stop: bool = False
     trailing_stop_positive: Optional[float] = None
@@ -121,6 +126,9 @@ class IStrategy(ABC, HyperStrategyMixin):
 
     def __init__(self, config: dict) -> None:
         self.config = config
+        #@custom:
+        self.get_daily_stoploss()
+        self.get_daily_stopprofit()
         # Dict to determine if analysis is necessary
         self._last_candle_seen_per_pair: Dict[str, datetime] = {}
         super().__init__(config)
@@ -547,6 +555,20 @@ class IStrategy(ABC, HyperStrategyMixin):
         Returns version of the strategy.
         """
         return None
+    
+    #@custom
+    def get_daily_stoploss(self) -> float:
+        """
+        Returns daily stop loss
+        """
+        logger.info(f"daily stop loss: {self.daily_stoploss}")
+        return self.daily_stoploss
+    def get_daily_stopprofit(self) -> float:
+        """
+        Returns daily stop loss
+        """
+        logger.info(f"daily stop loss: {self.daily_stopprofit}")
+        return self.daily_stopprofit
 
 ###
 # END - Intended to be overridden by strategy

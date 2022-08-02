@@ -77,6 +77,11 @@ class Backtesting:
         self.trade_id_counter: int = 0
         self.order_id_counter: int = 0
 
+        #@custom var:
+        self.daily_stoploss: float = -10.0
+        self.daily_stopprofit: float = 10.0
+        #@end
+
         config['dry_run'] = True
         self.run_ids: Dict[str, str] = {}
         self.strategylist: List[IStrategy] = []
@@ -998,7 +1003,7 @@ class Backtesting:
         if row[DATE_IDX] > current_time:
             return None
         return row
-
+#@mark01 mirar aca: se llama este metodo cuando no existe data anterior para precargar:***********************************************************
     def backtest(self, processed: Dict,
                  start_date: datetime, end_date: datetime,
                  max_open_trades: int = 0, position_stacking: bool = False,
@@ -1038,7 +1043,20 @@ class Backtesting:
             (end_date - start_date) / timedelta(minutes=self.timeframe_min)))
 
         # Loop timerange and get candle for each pair at that point in time
+        #@al parecer en este loop se hace cada transaccion y genera la lista de resultados: <=======================<<
+        myLog ="" #para almacenar data de prueba
+        start_profit= self.wallets.get_total(self.strategy.config['stake_currency'])#para calcular el percent profit
+        csvData = " Total Profit %,Daily Total Profit %,Fixed Tot Profit %,Final Balance , Wallet Used , Wallet Free ,   Date   , Time \n" #informe csv
+        tomorrow = current_time+timedelta(days=1)
+        daily_start_total_profit = start_profit
+        ceil_profit = start_profit
+
         while current_time <= end_date:
+            if current_time.day == tomorrow.day:
+                tomorrow +=timedelta(days=1)
+                daily_start_total_profit = self.wallets.get_total(self.strategy.config['stake_currency'])
+                ceil_profit = daily_start_total_profit if daily_start_total_profit > ceil_profit else ceil_profit
+
             open_trade_count_start = open_trade_count
             self.check_abort()
             for i, pair in enumerate(data):
@@ -1113,14 +1131,48 @@ class Backtesting:
                         self.run_protections(
                             enable_protections, pair, current_time, trade.trade_direction)
 
+            #@--------------------------------------------------------------------------#
+            final_balance = self.wallets.get_total(self.strategy.config['stake_currency'])
+            wallet_used = self.wallets.get_used(self.strategy.config['stake_currency'])
+            wallet_free = self.wallets.get_free(self.strategy.config['stake_currency'])
+            my_date = current_time.strftime(r"%Y-%m-%d")
+            my_time = current_time.strftime(r"%X")
+            tot_prof_perc = round((final_balance - start_profit)*100.00/start_profit, 2)
+            daily_tot_profit_perc = round((final_balance - daily_start_total_profit)*100 /daily_start_total_profit, 2)
+            fixed_tot_profit_perc = round((final_balance - ceil_profit)*100 / ceil_profit, 2)
+            myLog += "time: {3}\nwallet used: {0}\nwallet free: {1}\nfinal balance:{2}\ntotal profit %: {4}\n**********\n".format(wallet_used, wallet_free, final_balance, current_time,tot_prof_perc);
+            csvData +="{0},{1},{2},{3},{4},{5},{6},{7}\n".format(tot_prof_perc, daily_tot_profit_perc, fixed_tot_profit_perc,final_balance, wallet_used, wallet_free, my_date, my_time)
+            #print("*"*50)
+            #print("wallet used: {}".format(wallet_used))
+            #print("wallet free: {}".format(wallet_free))
+            #print("final balance: {}".format(final_balance))
+            #print("*"*50)
+            #@------------------------------------------------------------------------#
             # Move time one configured time_interval ahead.
             self.progress.increment()
             current_time += timedelta(minutes=self.timeframe_min)
-
+            if fixed_tot_profit_perc < self.daily_stoploss or fixed_tot_profit_perc > self.daily_stopprofit:
+                current_time = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         trades += self.handle_left_open(open_trades, data=data)
         self.wallets.update()
 
         results = trade_list_to_dataframe(trades)
+#@delete me:
+        final_balance = self.wallets.get_total(self.strategy.config['stake_currency'])
+        wallet_used = self.wallets.get_used(self.strategy.config['stake_currency'])
+        wallet_free = self.wallets.get_free(self.strategy.config['stake_currency'])
+        print("*"*50)
+        print("final wallet used: {}".format(wallet_used))
+        print("final wallet free: {}".format(wallet_free))
+        print("final balance: {}".format(final_balance))
+        print("*"*50)
+        with open("/home/luis/freqtrade.mylog.txt", "w") as f:
+            f.write(myLog)
+            f.close()
+        with open("/home/luis/freqtrade.mylog.csv", "w") as f:
+            f.write(csvData)
+            f.close()
+#@ end delete me
         return {
             'results': results,
             'config': self.strategy.config,
@@ -1133,7 +1185,7 @@ class Backtesting:
             'replaced_entry_orders': self.replaced_entry_orders,
             'final_balance': self.wallets.get_total(self.strategy.config['stake_currency']),
         }
-
+#@aca se generan los resultados del backtest:
     def backtest_one_strategy(self, strat: IStrategy, data: Dict[str, DataFrame],
                               timerange: TimeRange):
         self.progress.init_step(BacktestState.ANALYZE, 0)
@@ -1168,6 +1220,7 @@ class Backtesting:
                     f'up to {max_date.strftime(DATETIME_PRINT_FORMAT)} '
                     f'({(max_date - min_date).days} days).')
         # Execute backtest and store results
+        #@aca se ejecuta el backtest y se obtiene la lista de resultados:
         results = self.backtest(
             processed=preprocessed,
             start_date=min_date,
@@ -1222,7 +1275,7 @@ class Backtesting:
         elif backtest_cache_age == 'month':
             min_backtest_date = datetime.now(tz=timezone.utc) - timedelta(weeks=4)
         return min_backtest_date
-
+#@se llama a btanalysis para traer resultados anteriores:
     def load_prior_backtest(self):
         self.run_ids = {
             strategy.get_strategy_name(): get_strategy_run_id(strategy)
@@ -1233,9 +1286,10 @@ class Backtesting:
         # This can be circumvented in certain instances in combination with downloading more data
         min_backtest_date = self._get_min_cached_backtest_date()
         if min_backtest_date is not None:
+            #@se llama a btanalysis para traer resultados anteriores
             self.results = find_existing_backtest_stats(
                 self.config['user_data_dir'] / 'backtest_results', self.run_ids, min_backtest_date)
-
+#@start point
     def start(self) -> None:
         """
         Run backtesting end-to-end
@@ -1246,15 +1300,20 @@ class Backtesting:
         data, timerange = self.load_bt_data()
         self.load_bt_data_detail()
         logger.info("Dataload complete. Calculating indicators")
-
+#@se llama a btanalysis para obtener datos previos si es que los hay:
         self.load_prior_backtest()
 
         for strat in self.strategylist:
+            print("*"*100)
+            self.daily_stoploss = strat.get_daily_stoploss()
+            self.daily_stopprofit =strat.get_daily_stopprofit()
+            print("strategy daily stopploss from backtesting class: {}".format(self.daily_stoploss))
+            print("*"*100)
             if self.results and strat.get_strategy_name() in self.results['strategy']:
                 # When previous result hash matches - reuse that result and skip backtesting.
                 logger.info(f'Reusing result of previous backtest for {strat.get_strategy_name()}')
                 continue
-            min_date, max_date = self.backtest_one_strategy(strat, data, timerange)
+            min_date, max_date = self.backtest_one_strategy(strat, data, timerange)#TODO: aqui genera los resultados del backtest
 
         # Update old results with new ones.
         if len(self.all_results) > 0:
