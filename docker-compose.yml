@@ -11,9 +11,11 @@ services:
     #   context: .
     #   dockerfile: "./docker/Dockerfile.custom"
     restart: unless-stopped
-    container_name: freqtrade
+    container_name: freqtrade_custom
     volumes:
       - "./user_data:/freqtrade/user_data"
+      - "./freqtrade/strategy/interface.py:/freqtrade/strategy/interface.py"
+      - "./freqtrade/optimize/backtesting.py:/freqtrade/optimize/backtesting.py"
     # Expose api on port 8080 (localhost only)
     # Please read the https://www.freqtrade.io/en/stable/rest-api/ documentation
     # before enabling this.

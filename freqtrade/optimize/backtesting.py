@@ -1135,13 +1135,17 @@ class Backtesting:
             final_balance = self.wallets.get_total(self.strategy.config['stake_currency'])
             wallet_used = self.wallets.get_used(self.strategy.config['stake_currency'])
             wallet_free = self.wallets.get_free(self.strategy.config['stake_currency'])
-            my_date = current_time.strftime(r"%Y-%m-%d")
-            my_time = current_time.strftime(r"%X")
+            
+            #my_date = current_time.strftime(r"%Y-%m-%d")
+            #my_time = current_time.strftime(r"%X")
+            
             tot_prof_perc = round((final_balance - start_profit)*100.00/start_profit, 2)
             daily_tot_profit_perc = round((final_balance - daily_start_total_profit)*100 /daily_start_total_profit, 2)
             fixed_tot_profit_perc = round((final_balance - ceil_profit)*100 / ceil_profit, 2)
-            myLog += "time: {3}\nwallet used: {0}\nwallet free: {1}\nfinal balance:{2}\ntotal profit %: {4}\n**********\n".format(wallet_used, wallet_free, final_balance, current_time,tot_prof_perc);
-            csvData +="{0},{1},{2},{3},{4},{5},{6},{7}\n".format(tot_prof_perc, daily_tot_profit_perc, fixed_tot_profit_perc,final_balance, wallet_used, wallet_free, my_date, my_time)
+            
+            #myLog += "time: {3}\nwallet used: {0}\nwallet free: {1}\nfinal balance:{2}\ntotal profit %: {4}\n**********\n".format(wallet_used, wallet_free, final_balance, current_time,tot_prof_perc);
+            #csvData +="{0},{1},{2},{3},{4},{5},{6},{7}\n".format(tot_prof_perc, daily_tot_profit_perc, fixed_tot_profit_perc,final_balance, wallet_used, wallet_free, my_date, my_time)
+            
             #print("*"*50)
             #print("wallet used: {}".format(wallet_used))
             #print("wallet free: {}".format(wallet_free))
